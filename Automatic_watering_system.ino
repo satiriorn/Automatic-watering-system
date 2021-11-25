@@ -1,6 +1,5 @@
 #include <ESP8266WiFi.h>
-#include <ESP.h>
-#include "driver/gpio.h"
+#include <WiFiClientSecure.h>
 #include <UniversalTelegramBot.h>
 #include <ArduinoJson.h>
 #include "badge.hpp"
@@ -15,6 +14,7 @@ void setup() {
   Serial.begin(115200);
   delay(100);
   pinMode(pump, OUTPUT);
+  digitalWrite(pump, HIGH);
   secured_client.setTrustAnchors(&cert);
   Serial.print("Connecting to Wifi SSID ");
   Serial.print(ssid);
@@ -26,31 +26,36 @@ void setup() {
   }
   Serial.print("\nWiFi connected. IP address: ");
   Serial.println(WiFi.localIP());
+  configTime(0, 0, "pool.ntp.org"); // get UTC time via NTP
+  time_t now = time(nullptr);
+  while (now < 24 * 3600)
+  {
+    Serial.print(".");
+    delay(100);
+    now = time(nullptr);
+  }
+  Serial.println(now);
 }
 
 void loop() {
   x = analogRead(0);
+  bot.sendMessage(CHAT_ID, String(x), "");
   Serial.println(x);
   if (x > 520) {
-    bot.sendMessage(CHAT_ID, String(x) + "Pump on", "");
-    digitalWrite(pump, HIGH);
+    bot.sendMessage(CHAT_ID, "Pump on", "");
+    delay(100);
     do {
-      digitalWrite(pump, HIGH);
+      digitalWrite(pump, LOW);
       x = analogRead(0);
       delay(5000);
     }
     while (x > 430);
     Serial.println("DEEP SLEEEP");
-    digitalWrite(pump, LOW);
-    //
+    bot.sendMessage(CHAT_ID, "Pump off", "");
     ESP.deepSleep(3600000000UL);
   }
   else {
     Serial.println("DEEP SLEEEP");
-    bot.sendMessage(CHAT_ID, String(x), "");
-    gpio_pin_wakeup_disable();
-    //ESP.gpio_hold_en(pump);
-    digitalWrite(pump, LOW);
     ESP.deepSleep(3600000000UL);
   }
 }
